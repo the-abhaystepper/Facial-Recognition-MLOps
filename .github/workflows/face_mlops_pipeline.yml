@@ -1,0 +1,53 @@
+name: Face Recognition MLOps Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  mlops_run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Set up OpenJDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Launch Cassandra Container
+        run: |
+          docker run -d --name cassandra -p 9042:9042 cassandra:latest
+          echo "Waiting for Cassandra..."
+          sleep 30
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Execute Diagnostics Check
+        run: |
+          pytest test_app.py -v
+
+      - name: Populate Cassandra Data
+        run: |
+          python ingest_logs_to_cassandra.py
+          echo "Distributed logs ingested."
+
+      - name: Run Model Training & Tracking
+        run: |
+          # Ensure local mlflow is used if no server is provided
+          export MLFLOW_TRACKING_URI=sqlite:///mlflow.db
+          python train_face_model.py
+          echo "Model training tracked in MLflow."

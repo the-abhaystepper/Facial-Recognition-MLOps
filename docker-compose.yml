@@ -1,0 +1,25 @@
+services:
+  cassandra:
+    image: cassandra:latest
+    container_name: face_system_db
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    environment:
+      - CASSANDRA_CLUSTER_NAME=FaceAuthCluster
+
+  mlflow:
+    image: python:3.10-slim
+    container_name: face_mlops_mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/artifacts
+    command: >
+      sh -c "pip install mlflow && 
+             mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /artifacts"
+
+volumes:
+  cassandra_data:
+  mlflow_data:

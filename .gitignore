@@ -1,0 +1,27 @@
+# Environments
+venv/
+.venv/
+env/
+
+# Datasets
+dataset/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# MLflow
+mlflow.db
+mlruns/
+
+# Logs
+*.csv
+supervisory_msg.txt
+lockdown_signal.txt
+
+# Local Model Files (since they are artifacts now)
+face_model_quantized.tflite
+labels.h
+model_data.h
