@@ -8,8 +8,9 @@ import mlflow
 import mlflow.tensorflow
 
 def train_and_convert_model(dataset_dir='dataset', output_model='face_model_quantized.tflite', epochs=20):
-    # Setup MLflow
-    mlflow.set_tracking_uri("http://localhost:5000")
+    # Setup MLflow - Use environment variable if available (for CI/CD), otherwise local Docker
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("Face_Recognition_Auth")
     
     with mlflow.start_run():
