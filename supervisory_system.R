@@ -26,7 +26,10 @@ log_event <- function(type, message) {
         writeLines("Timestamp,EventType,Message", event_log_file)
     }
     line <- sprintf("%s,%s,\"%s\"", timestamp, type, message)
-    cat(paste0(line, "\n"), file = event_log_file, append = TRUE)
+    # Using a file connection with close() to force immediate disk write
+    con <- file(event_log_file, "a")
+    writeLines(line, con)
+    close(con)
 }
 
 check_anomalies <- function(recent_data) {

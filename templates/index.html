@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Security System Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-purple: #9d00ff;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #1a0b3b, #09090b);
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(to right, var(--neon-blue), var(--neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0;
+        }
+
+        .status-badge {
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            padding: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--neon-blue);
+            box-shadow: 0 10px 30px rgba(0, 242, 255, 0.1);
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            display: block;
+        }
+
+        .trend-up { color: #00ff88; font-size: 0.9rem; }
+
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .log-table th {
+            text-align: left;
+            color: rgba(255, 255, 255, 0.4);
+            padding-bottom: 10px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .log-table td {
+            padding: 12px 0;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .confidence-pill {
+            background: rgba(0, 242, 255, 0.1);
+            color: var(--neon-blue);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Command Center</h1>
+                <p style="color: rgba(255,255,255,0.4)">Security Command Center</p>
+            </div>
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                System Active
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <span class="stat-label">Total Detections</span>
+                <span class="stat-value" id="val-detections">0</span>
+                <span class="trend-up">↑ Distributed Logs</span>
+            </div>
+            <div class="card">
+                <span class="stat-label">Anomalies</span>
+                <span class="stat-value" id="val-anomalies" style="color: #ff3e3e">0</span>
+                <span style="color: rgba(255,255,255,0.3)">Real-time Cassandra</span>
+            </div>
+            <div class="card">
+                <span class="stat-label">Model Accuracy</span>
+                <span class="stat-value" id="val-accuracy" style="color: var(--neon-blue)">0%</span>
+                <span style="color: rgba(255,255,255,0.3)">MLflow Verified</span>
+            </div>
+            <div class="card">
+                <span class="stat-label">Last Audit</span>
+                <span class="stat-value" id="val-audit" style="font-size: 1.2rem; margin-top: 10px;">Never</span>
+                <span style="color: rgba(255,255,255,0.3)">Latest Timestamp</span>
+            </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 2fr 1fr;">
+            <div class="card">
+                <h3 style="margin-top: 0">Activity Streams</h3>
+                <table class="log-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Identity</th>
+                            <th>Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-body">
+                    </tbody>
+                </table>
+            </div>
+            <div class="card">
+                <h3 style="margin-top: 0">System Topology</h3>
+                <p style="color: rgba(255,255,255,0.5)">MLflow Run ID: <b id="val-runid" style="color: white">N/A</b></p>
+                <div style="height: 150px; background: rgba(0,0,0,0.2); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed var(--glass-border)">
+                    <span style="color: var(--neon-purple); font-weight: 700;">Local Edge Node</span>
+                    <span style="color: rgba(255,255,255,0.3); font-size: 0.8rem;">ESP32-CAM (esp32.local)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('val-detections').innerText = data.total_detections;
+                document.getElementById('val-anomalies').innerText = data.anomaly_count;
+                document.getElementById('val-accuracy').innerText = data.model_accuracy;
+                document.getElementById('val-runid').innerText = data.run_id;
+                document.getElementById('val-audit').innerText = data.last_audit;
+                
+                const statusBadge = document.querySelector('.status-badge');
+                const statusDot = document.querySelector('.status-dot');
+                if (data.lockdown_status === "LOCKED") {
+                    statusBadge.style.color = "#ff3e3e";
+                    statusBadge.style.background = "rgba(255, 62, 62, 0.1)";
+                    statusBadge.innerText = "🚨 SYSTEM LOCKED";
+                    statusDot.style.background = "#ff3e3e";
+                    statusDot.style.boxShadow = "0 0 15px #ff3e3e";
+                } else {
+                    statusBadge.style.color = "#00ff88";
+                    statusBadge.style.background = "rgba(0, 255, 136, 0.1)";
+                    statusBadge.innerHTML = '<div class="status-dot"></div> System Active';
+                }
+
+                const logBody = document.getElementById('log-body');
+                logBody.innerHTML = '';
+                data.recent_logs.forEach(log => {
+                    logBody.innerHTML += `
+                        <tr>
+                            <td>${log.time}</td>
+                            <td>${log.label}</td>
+                            <td><span class="confidence-pill">${log.confidence}</span></td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        }
+
+        setInterval(updateStats, 3000);
+        updateStats();
+    </script>
+</body>
+</html>

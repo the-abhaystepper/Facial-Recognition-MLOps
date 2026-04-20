@@ -6,3 +6,5 @@ numpy
 matplotlib
 findspark
 pytest
+opencv-python
+flask

@@ -8,6 +8,16 @@ from queue import Queue
 import cv2
 import requests
 import subprocess
+from cassandra.cluster import Cluster
+
+# Initialize Cassandra connection for real-time distributed logging
+try:
+    cluster = Cluster(['127.0.0.1'])
+    cassandra_session = cluster.connect('security_system')
+    print("Connected to Distributed Database (Cassandra)")
+except Exception as e:
+    cassandra_session = None
+    print(f"Warning: Cassandra not reached. Dashboard updates via manual ingest only.")
 
 # Global queue and state
 send_queue = Queue(maxsize=1)
@@ -21,7 +31,8 @@ def sender_worker(url):
         if data is None: break
         
         try:
-            response = requests.post(url, data=data, headers={'Content-Type': 'application/octet-stream'}, timeout=5)
+            # Re-enabling the 10s timeout for network stability
+            response = requests.post(url, data=data, headers={'Content-Type': 'application/octet-stream'}, timeout=10)
             if response.status_code == 200:
                 response_text = response.text.strip()
                 last_prediction = response_text
@@ -35,17 +46,55 @@ def sender_worker(url):
                     with open("detection_log.csv", "a", newline='') as f:
                         writer = csv.writer(f)
                         writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), label, confidence])
+                    
+                    # Log to Distributed DB (Cassandra) in Real-time
+                    if cassandra_session:
+                        try:
+                            ts = datetime.now()
+                            # 1. Log to main history
+                            query1 = "INSERT INTO detections (timestamp, label, confidence) VALUES (?, ?, ?)"
+                            prepared1 = cassandra_session.prepare(query1)
+                            cassandra_session.execute(prepared1, (ts, label, float(confidence)))
+                            
+                            # 2. Log to Live Feed
+                            query2 = "INSERT INTO recent_activity (feed_type, timestamp, label, details) VALUES (?, ?, ?, ?)"
+                            prepared2 = cassandra_session.prepare(query2)
+                            cassandra_session.execute(prepared2, ("LIVE_FEED", ts, label, f"Confidence: {confidence}"))
+                        except Exception as e:
+                            print(f"Cassandra Live Log Error: {e}")
                 except Exception as e:
                     print(f"Logging error: {e}")
-
-        except Exception:
-            pass
+        except Exception as e:
+            if "last_err_print" not in globals() or time.time() - last_err_print > 5:
+                print(f"Connection Error: {e}")
+                globals()["last_err_print"] = time.time()
         finally:
             send_queue.task_done()
 
+def anomaly_watcher(cassandra_session):
+    """Watches event_log.csv for new anomalies and pushes them to Cassandra."""
+    if not cassandra_session: return
+    last_pos = os.path.getsize("event_log.csv") if os.path.exists("event_log.csv") else 0
+    
+    while True:
+        if os.path.exists("event_log.csv"):
+            with open("event_log.csv", "r") as f:
+                f.seek(last_pos)
+                new_data = f.read()
+                last_pos = f.tell()
+                for line in new_data.splitlines():
+                    try:
+                        parts = line.strip().split(',')
+                        if len(parts) >= 2:
+                            ts, ev_type, msg = parts[0], parts[1], parts[2] if len(parts)>2 else ""
+                            q = "INSERT INTO recent_activity (feed_type, timestamp, label, details) VALUES (?, ?, ?, ?)"
+                            cassandra_session.execute(cassandra_session.prepare(q), ("LIVE_FEED", datetime.now(), ev_type, msg))
+                    except: pass
+        time.sleep(2)
+
 def main():
     parser = argparse.ArgumentParser(description="Laptop Camera Sender to ESP32")
-    parser.add_argument("--ip", type=str, default="esp32.local", help="IP address or hostname of the ESP32 (default: esp32.local)")
+    parser.add_argument("--ip", type=str, default="esp32.local", help="IP address or hostname of the ESP32")
     args = parser.parse_args()
 
     url = f"http://{args.ip}/upload"
@@ -57,26 +106,21 @@ def main():
             writer = csv.writer(f)
             writer.writerow(["Timestamp", "Label", "Confidence"])
 
-    # Clean up stop signal from previous runs
-    if os.path.exists("supervisory_stop.txt"):
-        os.remove("supervisory_stop.txt")
+    threading.Thread(target=sender_worker, args=(url,), daemon=True).start()
+    threading.Thread(target=anomaly_watcher, args=(cassandra_session,), daemon=True).start()
 
     # Start R Supervisory System
     print("Starting R Supervisory System...")
     r_process = None
     try:
         r_process = subprocess.Popen([r"C:\Program Files\R\R-4.5.2\bin\x64\Rscript.exe", "supervisory_system.R"])
-    except FileNotFoundError:
-        print("Warning: 'Rscript' not found. Ensure R is installed and in your PATH.")
     except Exception as e:
         print(f"Warning: Could not start R script: {e}")
-            
-    cap = cv2.VideoCapture(0) 
+
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: Could not open webcam.")
         return
-
-    threading.Thread(target=sender_worker, args=(url,), daemon=True).start()
 
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 

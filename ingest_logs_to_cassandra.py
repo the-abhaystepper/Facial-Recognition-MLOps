@@ -31,6 +31,16 @@ def setup_cassandra_schema(session):
             PRIMARY KEY (event_type, timestamp)
         ) WITH CLUSTERING ORDER BY (timestamp DESC);
     """)
+
+    session.execute("""
+        CREATE TABLE IF NOT EXISTS recent_activity (
+            feed_type text,
+            timestamp timestamp,
+            label text,
+            details text,
+            PRIMARY KEY (feed_type, timestamp)
+        ) WITH CLUSTERING ORDER BY (timestamp DESC);
+    """)
     print("Schema setup complete.")
 
 def parse_ts(ts_str):

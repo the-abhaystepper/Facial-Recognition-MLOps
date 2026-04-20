@@ -152,5 +152,39 @@ def train_and_convert_model(dataset_dir='dataset', output_model='face_model_quan
         print(f"Success! Model saved to {output_model}")
         print(f"Model Size: {len(tflite_model) / 1024:.2f} KB")
 
+        # AUTOMATED DEPLOYMENT: Convert and Sync to ESP32 folder
+        generate_c_headers(output_model, "labels.h")
+
+def generate_c_headers(tflite_path, labels_path):
+    import shutil
+    print("\n--- Starting Automated Deployment Sync ---")
+    
+    arduino_dir = "esp32_webserver"
+    if not os.path.exists(arduino_dir):
+        print(f"Warning: {arduino_dir} not found. Skipping sync.")
+        return
+
+    # 1. Convert TFLite to model_data.h
+    output_h = "model_data.h"
+    with open(tflite_path, 'rb') as f:
+        data = f.read()
+
+    with open(output_h, 'w') as f:
+        f.write("#ifndef MODEL_DATA_H\n#define MODEL_DATA_H\n\n")
+        f.write(f"const unsigned char g_model[] = {{\n")
+        chunk_size = 12
+        for i in range(0, len(data), chunk_size):
+            chunk = data[i:i+chunk_size]
+            hex_chunk = ", ".join(f"0x{b:02x}" for b in chunk)
+            f.write(f"  {hex_chunk},\n" if i + chunk_size < len(data) else f"  {hex_chunk}\n")
+        f.write(f"}};\nconst unsigned int g_model_len = {len(data)};\n#endif\n")
+    
+    # 2. Sync files to Arduino directory
+    shutil.copy(output_h, os.path.join(arduino_dir, output_h))
+    shutil.copy(labels_path, os.path.join(arduino_dir, "labels.h"))
+    
+    print(f"Done! Files synced to: {arduino_dir}/")
+    print("You can now open the Arduino IDE and upload to your ESP32-CAM.")
+
 if __name__ == "__main__":
     train_and_convert_model()
