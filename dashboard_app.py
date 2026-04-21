@@ -67,11 +67,12 @@ def stats():
             # Get the Live Feed (Unified)
             rows = session.execute("SELECT * FROM recent_activity WHERE feed_type='LIVE_FEED' LIMIT 8")
             for r in rows:
-                # Detections usually have 'Confidence' in the details string
-                is_anomaly = "Confidence" not in (r.details or "")
+                lbl = (r.label or "").upper()
+                is_alert = any(x in lbl for x in ["ANOMALY", "DENIED", "LOCKDOWN"])
+                
                 recent_logs.append({
                     "time": r.timestamp.strftime("%H:%M:%S"),
-                    "label": r.label if not is_anomaly else f"⚠️ {r.label}",
+                    "label": r.label if not is_alert else f"⚠️ {r.label}",
                     "confidence": r.details
                 })
         except Exception as e:

@@ -73,8 +73,13 @@ def sender_worker(url):
 
 def anomaly_watcher(cassandra_session):
     """Watches event_log.csv for new anomalies and pushes them to Cassandra."""
-    if not cassandra_session: return
-    last_pos = os.path.getsize("event_log.csv") if os.path.exists("event_log.csv") else 0
+    if not cassandra_session: 
+        print("Anomaly Watcher: Cassandra not connected. Sync disabled.")
+        return
+    
+    # Start from 0 to catch recent anomalies on restart
+    last_pos = 0 
+    print("Anomaly Watcher: Active and syncing...")
     
     while True:
         if os.path.exists("event_log.csv"):
@@ -83,13 +88,19 @@ def anomaly_watcher(cassandra_session):
                 new_data = f.read()
                 last_pos = f.tell()
                 for line in new_data.splitlines():
+                    if not line.strip() or line.startswith("Timestamp"): continue
                     try:
                         parts = line.strip().split(',')
                         if len(parts) >= 2:
-                            ts, ev_type, msg = parts[0], parts[1], parts[2] if len(parts)>2 else ""
+                            # Use current time for the live feed to ensure they are 'recent'
+                            ev_type = parts[1].strip()
+                            msg = parts[2].strip().replace('"', '') if len(parts) > 2 else ""
+                            
                             q = "INSERT INTO recent_activity (feed_type, timestamp, label, details) VALUES (?, ?, ?, ?)"
                             cassandra_session.execute(cassandra_session.prepare(q), ("LIVE_FEED", datetime.now(), ev_type, msg))
-                    except: pass
+                            print(f"[LIVE SYNC] Anomaly uploaded: {ev_type}")
+                    except Exception as e:
+                        print(f"Anomaly Sync Error: {e}")
         time.sleep(2)
 
 def main():
