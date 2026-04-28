@@ -109,7 +109,7 @@ def main():
     args = parser.parse_args()
 
     url = f"http://{args.ip}/upload"
-    print(f"Streaming to {url}...")
+    print(f"Streaming to {url}")
     
     # Initialize CSV header if needed
     if not os.path.exists("detection_log.csv"):
@@ -126,7 +126,7 @@ def main():
     try:
         r_process = subprocess.Popen([r"C:\Program Files\R\R-4.5.2\bin\x64\Rscript.exe", "supervisory_system.R"])
     except Exception as e:
-        print(f"Warning: Could not start R script: {e}")
+        print(f"Warning: Could not start script: {e}")
 
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -150,7 +150,7 @@ def main():
     def signal_worker():
         while True:
             try:
-                # 1. Check Lockdown Signal
+                #Check Lockdown Signal
                 if os.path.exists("lockdown_signal.txt"):
                     with open("lockdown_signal.txt", "r") as f:
                         curr_lockdown = f.read().strip()
@@ -165,7 +165,7 @@ def main():
                             print(f"Lockdown synchronized: {curr_lockdown}")
                         except: pass
                 
-                # 2. Check Supervisory Message
+                #Check Supervisory Message
                 if os.path.exists("supervisory_msg.txt"):
                     with open("supervisory_msg.txt", "r") as f:
                         curr_msg = f.read().strip()
@@ -180,12 +180,11 @@ def main():
                         except: pass
             except Exception:
                 pass
-            time.sleep(0.5) # Poll every half second
+            time.sleep(0.5) 
 
     threading.Thread(target=signal_worker, daemon=True).start()
 
     while True:
-        # The main while loop is now clean and only handles camera/UI
 
         ret, frame = cap.read()
         if not ret: break
@@ -232,14 +231,14 @@ def main():
         with open("supervisory_stop.txt", "w") as f: 
             f.write("STOP")
             f.flush()
-            os.fsync(f.fileno()) # Force write to disk for R to see it
+            os.fsync(f.fileno()) 
         
         print("Waiting for R to generate graphs... (Look for the R plot window)")
         
-        # Wait for R, but check if it's still alive
+
         while r_process.poll() is None:
             time.sleep(0.5)
-            # Check if user deleted the stop file manually as an 'emergency exit'
+
             if not os.path.exists("supervisory_stop.txt"):
                 break
             
